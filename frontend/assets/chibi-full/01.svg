@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 340" role="img" aria-label="Chibi Đại Nghĩa">
+<title>Chibi Đại Nghĩa</title>
+<defs><radialGradient id="halo" cx=".32" cy=".25" r=".85"><stop stop-color="#c23d48"/><stop offset="1" stop-color="#2b1b34"/></radialGradient></defs>
+<ellipse cx="128" cy="160" rx="111" ry="150" fill="#fff2d4" opacity=".13"/>
+<path d="M30 73 l4 -10 l4 10 l10 4 l-10 4 l-4 10 l-4 -10 l-10 -4 Z M213 58 l3 -8 l3 8 l8 3 l-8 3 l-3 8 l-3 -8 l-8 -3 Z" fill="#ffe8b0" opacity=".9"/>
+<ellipse cx="128" cy="324" rx="67" ry="9" fill="#441b1b" opacity=".25"/>
+<path d="M80 235 L126 235 L119 302 Q117 310 104 310 L87 307 Z M130 235 L176 235 L169 307 L151 310 Q139 308 138 302 Z" fill="#eee6dc" stroke="#42303c" stroke-width="3"/>
+<path d="M84 302 Q101 299 119 304 L122 316 Q103 325 79 318 Z M139 304 Q157 300 172 302 L179 318 Q154 325 136 316 Z" fill="#161a29" stroke="#42303c" stroke-width="3"/>
+<path d="M64 194 Q46 201 41 242 L44 264 L63 265 L77 222 Z M191 194 Q211 202 214 241 L211 264 L192 265 L179 222 Z" fill="#eee6dc" stroke="#42303c" stroke-width="3"/>
+<ellipse cx="54" cy="268" rx="12" ry="15" fill="#f4c6a3" stroke="#9d6d65" stroke-width="2"/>
+<ellipse cx="201" cy="268" rx="12" ry="15" fill="#f4c6a3" stroke="#9d6d65" stroke-width="2"/>
+<path d="M57 112 Q42 74 62 49 Q73 22 126 25 Q186 20 198 59 Q216 85 199 128 L185 163 Q173 172 156 174 L102 174 Q78 169 68 159 Z" fill="#161a29" stroke="#342734" stroke-width="3"/>
+<path d="M113 164 L143 164 L145 190 L111 190 Z" fill="#f4c6a3" stroke="#9d6d65" stroke-width="2"/>
+<path d="M61 201 Q80 178 101 176 L155 176 Q179 180 195 202 L211 255 H45 Z" fill="#eee6dc" stroke="#42303c" stroke-width="3"/><path d="M100 178 L128 210 L156 178 L157 255 H99 Z" fill="#fff9eb"/><path d="M96 177 L111 225 L104 255 M160 177 L145 225 L152 255" fill="none" stroke="#c23d48" stroke-width="8"/><path d="M94 204 L106 212 L94 220 L106 228 L94 236 M162 204 L150 212 L162 220 L150 228 L162 236" fill="none" stroke="#f4d077" stroke-width="2"/><circle cx="128" cy="231" r="2.3" fill="#f7deb1"/>
+<ellipse cx="54" cy="130" rx="11" ry="17" fill="#f4c6a3" stroke="#9d6d65" stroke-width="2"/>
+<ellipse cx="202" cy="130" rx="11" ry="17" fill="#f4c6a3" stroke="#9d6d65" stroke-width="2"/>
+<ellipse cx="128" cy="116" rx="68" ry="75" fill="#f4c6a3" stroke="#614451" stroke-width="3"/>
+<ellipse cx="89" cy="145" rx="12" ry="5" fill="#ef8d91" opacity=".23"/>
+<ellipse cx="167" cy="145" rx="12" ry="5" fill="#ef8d91" opacity=".23"/>
+<path d="M82 107 Q94 100 108 107 M148 107 Q161 100 174 107" fill="none" stroke="#583841" stroke-width="3" stroke-linecap="round"/>
+<ellipse cx="96" cy="124" rx="8" ry="10" fill="#282536"/><ellipse cx="160" cy="124" rx="8" ry="10" fill="#282536"/>
+<circle cx="93" cy="120" r="2.6" fill="white"/><circle cx="157" cy="120" r="2.6" fill="white"/>
+<path d="M128 128 q-4 11 1 13" fill="none" stroke="#b47869" stroke-width="1.6" opacity=".65"/>
+<path d="M114 153 Q128 169 143 153 Q128 160 114 153 Z" fill="#fffaf0" stroke="#9d5360" stroke-width="2"/>
+<path d="M56 97 C50 53 68 35 119 32 C166 28 200 57 198 99 C173 78 153 75 136 78 C108 85 88 83 56 97 Z M63 80 C92 94 127 86 153 51 C117 67 96 63 63 80 Z" fill="#161a29" stroke="#342734" stroke-width="2.5" stroke-linejoin="round"/>
+<circle cx="193" cy="139" r="4" fill="#f8d584"/><path d="M193 143 v8" stroke="#f8d584" stroke-width="2"/>
+</svg>

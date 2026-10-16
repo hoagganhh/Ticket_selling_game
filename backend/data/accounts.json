@@ -1,0 +1,9 @@
+[
+  {
+    "id": "b779123e-88b6-4870-bbc0-03b521ca2b29",
+    "username": "Hoang Anh",
+    "key": "hoang anh",
+    "salt": "80ba7de5f302f4c0c2a85277812eef7a",
+    "passwordHash": "d99260123443fc00616128f52647687785e12735862823dfd57f117b51d1bb2644509119d0d0d06f218351a46914f11d7d575758180992b863cf63d070feba77"
+  }
+]

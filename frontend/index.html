@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#a62917">
+  <meta name="description" content="Game mô phỏng điều hành quầy vé concert trên điện thoại.">
+  <title>Hỏa Tâm · Box Office</title>
+  <link rel="icon" href="assets/logo-concert.png" type="image/png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="styles.css?v=20261009a">
+  <link rel="stylesheet" href="compact.css?v=20261009a">
+  <script src="app.js?v=20261009a" defer></script>
+</head>
+<body>
+  <svg class="icon-defs" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <symbol id="i-pause" viewBox="0 0 24 24"><path d="M7 4h3v16H7zM14 4h3v16h-3z"/></symbol>
+    <symbol id="i-box" viewBox="0 0 24 24"><path d="m3 7 9-5 9 5v11l-9 5-9-5zM3 7l9 5 9-5M12 12v11M7 4l10 6"/></symbol>
+    <symbol id="i-lightstick" viewBox="0 0 24 24"><path d="M8 12h8v9H8zM12 2c1 3 4 4 4 7a4 4 0 0 1-8 0c0-2 1-3 2-4l1 2zM9 16h6"/></symbol>
+    <symbol id="i-shirt" viewBox="0 0 24 24"><path d="m8 3-6 4 3 5 3-2v11h8V10l3 2 3-5-6-4a4 4 0 0 1-8 0z"/></symbol>
+    <symbol id="i-banner" viewBox="0 0 24 24"><path d="M3 21V3m0 1h17l-4 5 4 5H3"/></symbol>
+    <symbol id="i-music" viewBox="0 0 24 24"><path d="M9 18V5l11-2v13M9 7l11-2"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></symbol>
+    <symbol id="i-video" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="3"/><path d="m10 8 6 4-6 4z"/></symbol>
+    <symbol id="i-ticket" viewBox="0 0 24 24"><path d="M3 6h18v4a2 2 0 0 0 0 4v4H3v-4a2 2 0 0 0 0-4zM9 6v2m0 2v2m0 2v2m0 2v0"/></symbol>
+    <symbol id="i-map" viewBox="0 0 24 24"><path d="m3 5 6-2 6 2 6-2v16l-6 2-6-2-6 2zM9 3v16M15 5v16"/></symbol>
+    <symbol id="i-artists" viewBox="0 0 24 24"><circle cx="11" cy="8" r="3"/><path d="M5 20v-2a6 6 0 0 1 12 0v2H5ZM19 3l.5 1.5L21 5l-1.5.5L19 7l-.5-1.5L17 5l1.5-.5z"/></symbol>
+    <symbol id="i-staff" viewBox="0 0 24 24"><circle cx="12" cy="7" r="3"/><circle cx="4.5" cy="9" r="2"/><circle cx="19.5" cy="9" r="2"/><path d="M6 20v-2a6 6 0 0 1 12 0v2H6ZM2 18v-2a4 4 0 0 1 3-3.9M22 18v-2a4 4 0 0 0-3-3.9"/></symbol>
+    <symbol id="i-feedback" viewBox="0 0 24 24"><path d="M4 4h16v12H9l-5 4V4zM8 9h8M8 12h5"/></symbol>
+    <symbol id="i-records" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></symbol>
+    <symbol id="i-scanner" viewBox="0 0 24 24"><path d="M3 9V4h5m8 0h5v5M3 15v5h5m8 0h5v-5M8 8h2v2H8zM14 8h2v2h-2zM8 14h2v2H8zM14 14h2v2h-2z"/></symbol>
+    <symbol id="i-queue" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2"/><circle cx="6" cy="12" r="2"/><circle cx="6" cy="18" r="2"/><path d="M11 6h10M11 12h10M11 18h10"/></symbol>
+    <symbol id="i-payment" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h5"/></symbol>
+    <symbol id="i-checker" viewBox="0 0 24 24"><path d="M3 6h18v4a2 2 0 0 0 0 4v4H3v-4a2 2 0 0 0 0-4zM9 6v2m0 2v2m0 2v2m0 2v0m3-6 2 2 4-4"/></symbol>
+    <symbol id="i-marketing" viewBox="0 0 24 24"><path d="M3 10h4l11-5v14L7 14H3zM7 14l2 6h4l-2-5M20 9l2-2M20 15l2 2"/></symbol>
+    <symbol id="i-security" viewBox="0 0 24 24"><path d="M12 2 20 5v6c0 5-3 8-8 11-5-3-8-6-8-11V5zM9 12l2 2 4-4"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><path d="M10 2h4l.7 2.4 2 .8 2.2-1.2 2.8 2.8-1.2 2.2.8 2L23 11v4l-2.4.7-.8 2 1.2 2.2-2.8 2.8-2.2-1.2-2 .8L14 24h-4l-.7-2.4-2-.8-2.2 1.2-2.8-2.8 1.2-2.2-.8-2L1 15v-4l2.4-.7.8-2L3 6.1l2.8-2.8L8 4.5l2-.8z"/><circle cx="12" cy="13" r="3"/></symbol>
+  </svg>
+  <div class="ambient" aria-hidden="true"><span></span><span></span><span></span></div>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand"><svg class="brand-mark" viewBox="260 270 1120 1160" role="img" aria-label="Biểu trưng Anh Trai Vượt Ngàn Chông Gai"><image href="assets/logo-concert.png" width="1638" height="2048" /></svg><div><strong>HỎA TÂM</strong><small>BOX OFFICE · 2026</small></div></div>
+      <div class="top-actions"><button class="icon-button" id="soundButton" aria-label="Mở MV bài hát chủ đề" aria-expanded="false" aria-controls="musicDock" title="Mở MV bài hát chủ đề"><svg class="ui-icon"><use href="#i-video"/></svg></button><button class="icon-button" data-modal="settings" aria-label="Cài đặt" title="Cài đặt"><svg class="ui-icon"><use href="#i-settings"/></svg></button></div>
+    </header>
+    <div class="session-toolbar"><small id="audioStatus" role="status">Nhạc nền sẵn sàng</small><button id="pauseButton" data-action="pause" class="secondary-btn"><svg class="ui-icon"><use href="#i-pause"/></svg> Tạm dừng</button></div>
+    <main id="app" aria-live="polite"></main>
+    <nav class="bottom-nav" aria-label="Các mục trong game">
+      <button data-view="play" class="nav-active"><svg class="ui-icon"><use href="#i-ticket"/></svg>Quầy vé</button>
+      <button data-view="map"><svg class="ui-icon"><use href="#i-map"/></svg>Sơ đồ</button>
+      <button data-view="artists"><svg class="ui-icon"><use href="#i-artists"/></svg>Anh tài</button>
+      <button data-view="staff"><svg class="ui-icon"><use href="#i-staff"/></svg>Nhân viên</button>
+      <button data-view="inventory"><svg class="ui-icon"><use href="#i-box"/></svg>Kho</button>
+      <button data-view="feedback"><svg class="ui-icon"><use href="#i-feedback"/></svg>Góp ý</button>
+      <button data-view="records"><svg class="ui-icon"><use href="#i-records"/></svg>Nhật ký</button>
+    </nav>
+  </div>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <div id="fx" aria-hidden="true"></div>
+  <audio id="backgroundMusic" src="assets/hoa-tam-background.wav" preload="auto" loop></audio>
+  <audio id="sfxClick" src="assets/sfx/click.wav" preload="auto"></audio>
+  <audio id="sfxHandoff" src="assets/sfx/handoff.wav" preload="auto"></audio>
+  <audio id="sfxSuccess" src="assets/sfx/success.wav" preload="auto"></audio>
+  <audio id="sfxBad" src="assets/sfx/bad.wav" preload="auto"></audio>
+  <aside id="musicDock" class="music-dock" hidden aria-label="Trình phát MV bài hát chủ đề"></aside>
+  <dialog id="modal"><div id="modalContent"></div><button class="modal-close" id="closeModal" aria-label="Đóng">×</button></dialog>
+</body>
+</html>

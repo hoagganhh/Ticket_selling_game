@@ -1,0 +1,10 @@
+{
+  "name": "Hỏa Tâm · Box Office",
+  "short_name": "Hỏa Tâm",
+  "description": "Game mô phỏng bán vé concert",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#260b0c",
+  "theme_color": "#a62917",
+  "icons": [{ "src": "assets/logo-concert.png", "sizes": "1638x2048", "type": "image/png", "purpose": "any" }]
+}
