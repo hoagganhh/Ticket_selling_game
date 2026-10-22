@@ -40,7 +40,7 @@ try {
     document: { querySelector: element, querySelectorAll: () => [], addEventListener(name, handler) { documentListeners.set(name, handler); }, hidden: false, body: { ...element('body'), append() {} }, createElement: () => ({ style: {}, remove() {}, animate(keyframes, options) { flightAnimation = { keyframes, options, markup: this.innerHTML }; return { finished: Promise.resolve() }; } }) },
     window: { AudioContext: AudioEngine, innerWidth: 390, innerHeight: 844, scrollTo() {}, addEventListener() {} },
     navigator: { userAgent: 'iPhone Safari', platform: 'iPhone', maxTouchPoints: 5 },
-    fetch: async url => ({ ok: true, json: async () => url === '/api/state' ? structuredClone(state) : JSON.parse(fs.readFileSync(path.join(root, 'frontend', url))), arrayBuffer: async () => new ArrayBuffer(4) }),
+    fetch: async url => ({ ok: true, json: async () => url === '/api/session' ? { loggedIn: false, username: null, playerId: 'test-player' } : url === '/api/state' ? { ...structuredClone(state), loggedIn: false, username: null, playerId: 'test-player' } : JSON.parse(fs.readFileSync(path.join(root, 'frontend', url))), arrayBuffer: async () => new ArrayBuffer(4) }),
     setInterval() {}, setTimeout() {}, clearTimeout() {}, console, Blob, structuredClone, fixture: state
   });
   vm.runInContext(fs.readFileSync(path.join(root, 'frontend/app.js'), 'utf8'), context);
@@ -120,7 +120,40 @@ try {
   vm.runInContext("openModal('settings')", context);
   assert.match(element('#modalContent').innerHTML, /Lưu tiến trình ngay/);
   assert.match(element('#modalContent').innerHTML, /Đăng nhập/);
-  console.log('PASS: hidden card choices without downloads, 34-artist badge, reputation HUD, live countdown, ticket flight, settings, inventory and iOS WAV effects.');
+  const userA = { ...structuredClone(fixtureState()), playerId: 'player-a', loggedIn: true, username: 'Nguoi A', cash: 1111111 };
+  const userB = { ...structuredClone(fixtureState()), playerId: 'player-b', loggedIn: true, username: 'Nguoi B', cash: 2222222 };
+  function fixtureState() { return { ...state, phase: 'intro', queue: [], paused: false, exited: false }; }
+  context.userA = userA;
+  context.userB = userB;
+  vm.runInContext('adoptSession(userA); game = userA;', context);
+  let resolveOldPoll;
+  let polls = 0;
+  const response = (value, status = 200) => ({ ok: status === 200, status, json: async () => structuredClone(value) });
+  context.fetch = async url => {
+    if (url === '/api/auth') return response(userB);
+    if (url === '/api/state' && polls++ === 0) return new Promise(resolve => { resolveOldPoll = resolve; });
+    return response(userB);
+  };
+  const oldPoll = vm.runInContext('refresh()', context);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(vm.runInContext('refresh()', context), oldPoll, 'slow requests do not accumulate one poll every second');
+  const switchAccount = vm.runInContext("accountAction('login', 'Nguoi B', 'matkhau123')", context);
+  resolveOldPoll(response(userA));
+  await Promise.all([oldPoll, switchAccount]);
+  assert.equal(vm.runInContext('game.playerId', context), userB.playerId);
+  assert.equal(vm.runInContext('game.cash', context), userB.cash, 'a late response for A cannot replace B’s save');
+  assert.match(element('#app').innerHTML, /Xin chào, Nguoi B/);
+  assert.doesNotMatch(element('#app').innerHTML, /Nguoi A/);
+  let sentIdentity;
+  context.fetch = async (url, options) => {
+    if (url === '/api/action') { sentIdentity = options.headers['X-Player-ID']; return response({ error: 'Changed session' }, 409); }
+    return response(userA);
+  };
+  await vm.runInContext("act('reset')", context);
+  assert.equal(sentIdentity, userB.playerId);
+  assert.equal(vm.runInContext('game.playerId', context), userA.playerId, 'a stale tab reloads its session after 409 instead of repeating the action');
+  assert.equal(vm.runInContext('pendingActions.length', context), 0);
+  console.log('PASS: account-switch races/stale tabs, hidden cards, reputation HUD, live countdown, ticket flight, settings, inventory and iOS WAV effects.');
 } finally {
   fs.rmSync(temp, { recursive: true, force: true });
 }

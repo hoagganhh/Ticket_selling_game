@@ -5,6 +5,37 @@ const modalContent = document.querySelector('#modalContent');
 let game = null;
 let lastSnapshotAt = Date.now();
 let session = { loggedIn: false, username: null };
+let sessionReady = false;
+let authBusy = false;
+let identityEpoch = 0;
+let apiQueue = Promise.resolve();
+let refreshTask = null;
+
+function apiJson(url, options = {}) {
+  const request = apiQueue.then(async () => {
+    const response = await fetch(url, { credentials: 'same-origin', cache: 'no-store', ...options });
+    return { response, result: await response.json() };
+  });
+  apiQueue = request.catch(() => {});
+  return request;
+}
+
+function adoptSession(next) {
+  if (session.playerId !== next.playerId) {
+    identityEpoch++;
+    game = null;
+    app.innerHTML = '<section class="card offline"><h2>Đang tải quầy vé của bạn…</h2></section>';
+    pendingActions = [];
+    seenEvent = 0;
+    renderStamp = '';
+    view = 'play';
+    toast.className = '';
+    document.querySelectorAll('.ticket-flight, .handoff-reaction').forEach(effect => effect.remove());
+    stopBackgroundMusic();
+  }
+  session = { loggedIn: next.loggedIn, username: next.username, playerId: next.playerId };
+  sessionReady = true;
+}
 let view = 'play';
 let busy = false;
 let pendingActions = [];
@@ -152,6 +183,7 @@ function updateLiveValues() {
 
 function animateTicket(sale, start, target) {
   if (!start || !target) return;
+  const epoch = identityEpoch;
   const flight = document.createElement('div');
   flight.className = 'ticket-flight';
   const width = Math.min(270, window.innerWidth - 34);
@@ -174,6 +206,7 @@ function animateTicket(sale, start, target) {
   ], { duration: 3800, easing: 'ease-in-out' });
   motion.finished.finally(() => flight.remove());
   setTimeout(() => {
+    if (epoch !== identityEpoch) return;
     beep('handoff');
     const reaction = document.createElement('div');
     reaction.className = 'handoff-reaction';
@@ -185,11 +218,20 @@ function animateTicket(sale, start, target) {
   }, 3600);
 }
 
-async function refresh() {
+function refresh() {
+  if (authBusy) return Promise.resolve();
+  if (!refreshTask) refreshTask = fetchState().finally(() => { refreshTask = null; });
+  return refreshTask;
+}
+
+async function fetchState() {
+  const epoch = identityEpoch;
   try {
-    const response = await fetch('/api/state', { cache: 'no-store' });
+    const { response, result } = await apiJson('/api/state');
     if (!response.ok) throw new Error('offline');
-    game = await response.json();
+    if (epoch !== identityEpoch) return;
+    adoptSession(result);
+    game = result;
     lastSnapshotAt = Date.now();
     if (game.paused || game.exited || game.phase === 'gameover') stopBackgroundMusic();
     if (!document.activeElement?.matches('.reply-input')) {
@@ -198,20 +240,25 @@ async function refresh() {
     }
     showToast(game.lastEvent);
   } catch {
-    if (!game) app.innerHTML = `<section class="offline card"><h2>Không kết nối được máy chủ</h2><p>Khởi chạy game bằng <code>npm start</code>, sau đó tải lại trang.</p><button class="primary-btn" onclick="location.reload()">Thử lại</button></section>`;
+    if (epoch === identityEpoch && !game) app.innerHTML = `<section class="offline card"><h2>Không kết nối được máy chủ</h2><p>Máy chủ có thể đang khởi động. Đợi một chút rồi thử tải lại trang.</p><button class="primary-btn" onclick="location.reload()">Thử lại</button></section>`;
   }
 }
 
 async function act(type, payload = {}) {
+  if (authBusy || !sessionReady) return;
   if (busy) { pendingActions.push({ type, payload }); return; }
   busy = true;
+  const epoch = identityEpoch;
   const previousSaleId = game?.lastSale?.eventId;
   const ticketStart = type === 'sellZone' ? document.querySelector(`.ticket-tile[data-id="${payload.id}"]`)?.getBoundingClientRect() : null;
   const ticketTarget = type === 'sellZone' ? document.querySelector('.scene-customer')?.getBoundingClientRect() : null;
   try {
-    const response = await fetch('/api/action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type, payload }) });
+    const { response, result } = await apiJson('/api/action', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Player-ID': session.playerId }, body: JSON.stringify({ type, payload }) });
+    if (epoch !== identityEpoch) return;
+    if (response.status === 409) { pendingActions = []; await loadSession(); await refresh(); return; }
     if (!response.ok) throw new Error('action failed');
-    game = await response.json();
+    adoptSession(result);
+    game = result;
     lastSnapshotAt = Date.now();
     if (['reset', 'endDay', 'exit', 'nextCampaign'].includes(type)) view = 'play';
     render();
@@ -219,7 +266,7 @@ async function act(type, payload = {}) {
     if (type === 'endDay' || type === 'exit') stopBackgroundMusic();
     if (type === 'sellZone' && game.lastSale && game.lastSale.eventId !== previousSaleId) animateTicket(game.lastSale, ticketStart, ticketTarget);
     showToast(game.lastEvent);
-  } catch { toast.textContent = 'Mất kết nối. Thử lại sau một chút.'; toast.className = 'visible bad'; }
+  } catch { if (epoch === identityEpoch) { toast.textContent = 'Mất kết nối. Thử lại sau một chút.'; toast.className = 'visible bad'; } }
   finally { busy = false; const next = pendingActions.shift(); if (next) act(next.type, next.payload); }
 }
 
@@ -392,6 +439,7 @@ function render() {
   if (serving && !document.querySelector('.live-workbench')) window.scrollTo({ top: 0, behavior: 'instant' });
   document.body.classList.toggle('serving-viewport', serving);
   app.innerHTML = game.phase === 'gameover' ? renderGameOver() : game.exited ? renderBreak() : view === 'map' ? renderMap() : view === 'artists' ? renderArtists() : view === 'feedback' ? renderFeedback() : view === 'records' ? renderRecords() : view === 'staff' ? renderStaff() : view === 'inventory' ? renderInventory() : game.paused ? renderBreak() : game.phase === 'playing' ? renderPlay() : renderIntermission();
+  if (view === 'play' && game.phase === 'intro') app.innerHTML = `<section class="player-account card"><div><strong>${session.loggedIn ? `Xin chào, ${escapeHtml(session.username)}` : 'Quầy vé của riêng bạn'}</strong><p>${session.loggedIn ? 'Tiến trình đang lưu riêng theo tài khoản. Đăng nhập cùng tài khoản để chơi trên thiết bị khác.' : 'Chơi thử với tiến trình riêng trên trình duyệt này, hoặc tạo tài khoản để tiếp tục trên thiết bị khác.'}</p></div><button class="secondary-btn" data-modal="settings">${session.loggedIn ? 'Tài khoản' : 'Đăng nhập / Đăng ký'}</button></section>` + app.innerHTML;
   document.querySelector('#pauseButton').hidden = game.exited || game.phase === 'gameover';
   document.querySelector('#pauseButton').dataset.action = game.paused ? 'resume' : 'pause';
   document.querySelector('#pauseButton').innerHTML = game.paused ? '▶ Tiếp tục' : `${uiIcon('pause')} Tạm dừng`;
@@ -407,32 +455,42 @@ function render() {
 
 function openModal(type) {
   if (type === 'help') modalContent.innerHTML = `<span class="eyebrow">SỔ TAY VẬN HÀNH</span><h2>Cách chơi</h2><ol><li>Chọn khách chibi trong hàng chờ và đọc khu vé họ đặt.</li><li>Nhấn <b>Xác minh</b> để phát hiện bot chen vào phiên, mã trùng hoặc lỗi thanh toán.</li><li>Với thanh toán lỗi, nhấn <b>Thanh toán lại</b>. Với phiên bị bot chen vào hoặc mã trùng, chọn <b>Chặn yêu cầu</b>.</li><li>Chạm trực tiếp <b>ô vé đúng khu</b>. Máy in sẽ chuyển vé tới khách.</li><li>Thuê nhân viên kiểm vé, marketing và bảo vệ trong mục <b>Nhân viên</b>. Điều phối bảo vệ khi có cảnh báo sự cố.</li><li>Sau ca, nộp quỹ thuế mô phỏng 5%. Ghé <b>Góp ý</b> trả lời khách và cải thiện uy tín.</li><li>Ghé <b>Kho</b> để nhập vé, lightstick, áo và banner. Trưng bày hàng để hút khách; bán vật phẩm khách đặt trước khi giao vé.</li><li>Dùng <b>Tạm dừng</b> khi bận, rồi <b>Tiếp tục chơi</b> hoặc <b>Kết thúc ngày bán</b> để đóng quầy ngay; hàng đã bán vẫn bị trừ. Mở <b>Cài đặt</b> để bật hoặc tắt âm thanh, lưu tiến trình, thoát và quản lý tài khoản.</li><li><b>Uy tín dưới 50:</b> trừ 100.000đ mỗi 10 giây thực đang bán. Tạm dừng sẽ dừng tiền phạt. <b>Uy tín bằng 0:</b> đóng quầy và phải chơi lại từ đầu.</li><li>Nếu khu khách muốn không còn đủ vé, khách sẽ về. Nhập kho để đón khách mới.</li></ol><p>Mỗi ngày bán vé dài 5 phút thực. Đồng hồ game chạy nhanh gấp 5 lần: 1 giây thực = 5 giây game. Vé, tiền, thuế, người thân và sự cố đều là tình huống game hư cấu.</p>`;
-  else if (type === 'settings') modalContent.innerHTML = `<span class="eyebrow">HỆ THỐNG · TÀI KHOẢN</span><h2>Cài đặt</h2><div class="settings-list"><button id="settingsSound" class="secondary-btn">${soundOn ? '🔊 Âm thanh: Bật' : '🔇 Âm thanh: Tắt'}</button><button id="settingsSave" class="secondary-btn">Lưu tiến trình ngay</button><button id="settingsExit" class="secondary-btn">Lưu và thoát game</button><button id="settingsHelp" class="secondary-btn">Hướng dẫn chơi</button><button id="settingsReset" class="danger-btn">Chơi lại từ đầu</button></div><div class="settings-account"><h3>Tài khoản ${session.loggedIn ? `· ${escapeHtml(session.username)}` : '· khách'}</h3>${session.loggedIn ? '<p>Tiến trình đang lưu trên máy chủ này dưới tài khoản của bạn.</p><button id="settingsLogout" class="secondary-btn">Đăng xuất</button>' : '<p>Tạo tài khoản trên máy chủ này để lưu tiến trình riêng. Đăng ký sẽ sao chép tiến trình khách hiện tại.</p><form id="accountForm"><label>Tên tài khoản<input name="username" autocomplete="username" minlength="3" maxlength="24" required></label><label>Mật khẩu<input name="password" type="password" autocomplete="current-password" minlength="8" required></label><div class="modal-actions"><button class="primary-btn" type="submit" data-auth="login">Đăng nhập</button><button class="secondary-btn" type="submit" data-auth="register">Đăng ký</button></div><p id="accountError" role="alert"></p></form>'}</div><small class="settings-note">Tài khoản và tiến trình lưu trên máy chủ game tại nhà/trường này; không đồng bộ lên Internet.</small>`;
-  else modalContent.innerHTML = `<span class="eyebrow">BẮT ĐẦU MỚI</span><h2>Xóa toàn bộ tiến trình?</h2><p>Ngày bán, tiền, kho, nhân viên, bộ sưu tập 34 anh tài, lượt mở thẻ và huy hiệu Gai Con sẽ trở về ban đầu. Tài khoản đăng nhập vẫn được giữ.</p><div class="modal-actions"><button class="secondary-btn" id="cancelReset">Giữ tiến độ</button><button class="danger-btn" id="confirmReset">Xóa và chơi lại</button></div>`;
+  else if (type === 'settings') modalContent.innerHTML = `<span class="eyebrow">HỆ THỐNG · TÀI KHOẢN</span><h2>Cài đặt</h2><div class="settings-list"><button id="settingsSound" class="secondary-btn">${soundOn ? '🔊 Âm thanh: Bật' : '🔇 Âm thanh: Tắt'}</button><button id="settingsSave" class="secondary-btn">Lưu tiến trình ngay</button><button id="settingsExit" class="secondary-btn">Lưu và thoát game</button><button id="settingsHelp" class="secondary-btn">Hướng dẫn chơi</button><button id="settingsReset" class="danger-btn">Chơi lại từ đầu</button></div><div class="settings-account"><h3>Tài khoản ${session.loggedIn ? `· ${escapeHtml(session.username)}` : '· khách'}</h3>${session.loggedIn ? '<p>Tiến trình được lưu riêng cho tài khoản này. Đăng nhập cùng tài khoản để tiếp tục trên thiết bị khác.</p><button id="settingsLogout" class="secondary-btn">Đăng xuất</button>' : '<p>Mỗi người chơi có tiến trình riêng. Đăng ký sẽ giữ phần chơi thử của riêng bạn trên trình duyệt này.</p><form id="accountForm"><label>Tên tài khoản<input name="username" autocomplete="username" minlength="3" maxlength="24" required></label><label>Mật khẩu<input name="password" type="password" autocomplete="current-password" minlength="8" required></label><div class="modal-actions"><button class="primary-btn" type="submit" data-auth="login">Đăng nhập</button><button class="secondary-btn" type="submit" data-auth="register">Đăng ký</button></div><p id="accountError" role="alert"></p></form>'}</div><small class="settings-note">Không chia sẻ tài khoản nếu muốn chơi riêng. Chơi thử được nhận diện bằng cookie trên trình duyệt; hãy tạo tài khoản trước khi đổi thiết bị hoặc xóa dữ liệu trình duyệt.</small>`;
+  else modalContent.innerHTML = `<span class="eyebrow">BẮT ĐẦU MỚI</span><h2>Xóa toàn bộ tiến trình?</h2><p>Chỉ tiến trình của bạn sẽ trở về ban đầu: ngày bán, tiền, kho, nhân viên, bộ sưu tập 34 anh tài, lượt mở thẻ và huy hiệu Gai Con. Tài khoản đăng nhập vẫn được giữ.</p><div class="modal-actions"><button class="secondary-btn" id="cancelReset">Giữ tiến độ</button><button class="danger-btn" id="confirmReset">Xóa và chơi lại</button></div>`;
   if (!modal.open) modal.showModal();
 }
 
 async function loadSession() {
+  const epoch = identityEpoch;
   try {
-    const response = await fetch('/api/session', { cache: 'no-store' });
-    if (response.ok) session = await response.json();
-  } catch { /* guest mode still works without an account */ }
+    const { response, result } = await apiJson('/api/session');
+    if (response.ok && epoch === identityEpoch) adoptSession(result);
+  } catch { /* refresh displays the connection error and retries the session */ }
 }
 
 async function accountAction(type, username, password) {
+  if (authBusy) return;
+  authBusy = true;
+  identityEpoch++;
+  pendingActions = [];
   const errorBox = document.querySelector('#accountError');
+  document.querySelectorAll('#accountForm button, #settingsLogout').forEach(button => { button.disabled = true; });
   try {
-    const response = await fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type, username, password }) });
-    const result = await response.json();
+    const { response, result } = await apiJson('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type, username, password }) });
     if (!response.ok) throw new Error(result.error || 'Không thể xử lý tài khoản.');
-    session = result;
+    adoptSession(result);
+    game = null;
     modal.close();
     view = 'play';
     seenEvent = 0;
+    authBusy = false;
     await refresh();
   } catch (error) {
     if (errorBox) errorBox.textContent = error.message;
     else { toast.textContent = error.message; toast.className = 'visible bad'; }
+  } finally {
+    authBusy = false;
+    document.querySelectorAll('#accountForm button, #settingsLogout').forEach(button => { button.disabled = false; });
   }
 }
 
@@ -631,8 +689,8 @@ modal.addEventListener('click', event => {
 });
 
 Promise.all([fetch('assets/portraits.json').then(r => r.json()), fetch('assets/portrait-frames.json').then(r => r.json())]).then(([photos, frames]) => { portraits = photos; portraitFrames = frames; if (game) render(); }).catch(() => {});
-refresh();
-setInterval(() => { if (!busy && game && !document.hidden) refresh(); }, 1000);
+loadSession().then(refresh);
+setInterval(() => { if (!busy && !authBusy && !document.hidden) { if (sessionReady) refresh(); else loadSession().then(refresh); } }, 1000);
 setInterval(updateLiveValues, 200);
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) stopBackgroundMusic();

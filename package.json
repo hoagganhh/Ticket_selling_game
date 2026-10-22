@@ -6,8 +6,18 @@
   "scripts": {
     "start": "node backend/server.js",
     "dev": "node --watch backend/server.js",
-    "check": "node --check backend/server.js && node --check backend/game.js && node --check backend/accounts.js && node --check frontend/app.js",
-    "test": "node tools/verify_game.mjs && node tools/verify_rules.mjs && node tools/verify_collection.mjs && node tools/verify_http.mjs && node tools/verify_frontend.mjs"
+    "check": "node --check backend/server.js && node --check backend/game.js && node --check backend/accounts.js && node --check backend/storage.js && node --check frontend/app.js",
+    "test": "node tools/verify_game.mjs && node tools/verify_rules.mjs && node tools/verify_collection.mjs && node tools/verify_http.mjs && node tools/verify_frontend.mjs && node tools/verify_postgres.mjs",
+    "migrate:accounts": "node tools/migrate_accounts.mjs"
   },
-  "engines": { "node": ">=18" }
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "pg": "^8.23.1"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.10",
+    "@electric-sql/pglite-socket": "^0.2.13"
+  }
 }

@@ -1,10 +1,10 @@
-#Box Office
+# Box Office
 
 A browser-based concert ticket booth management game. This is a personal simulation; it is not connected to any actual ticketing platforms or real-world payment systems.
 
 ## Running the game
 
-Requires Node.js 18 or higher. No additional packages need to be installed.
+Requires Node.js 18 or higher. Run `npm ci` to install dependencies, then `npm start`.
 
 ```powershell
 cd C:\Users\Admin\Documents\Codex\2026-09-30\t\outputs\hoa-tam-box-office
@@ -23,7 +23,9 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\tools\install_autostar
 
 This command creates a shortcut named `Hoa Tam Box Office.lnk` in the Startup folder of your current Windows user account, which launches the monitoring process in the background (hidden). It will not launch a duplicate instance if port 4173 is already in use. Logs are stored in the `runtime/` directory. To disable this automatic startup, simply delete the shortcut from the Startup folder. The backend will only function when the laptop is powered on, the user is logged in, the device is not in sleep mode, and there is an active network connection. Note that the `192.168.x.x` IP address assigned via Wi-Fi may change if you switch networks; this setup does not use a static IP. If you wish for someone on a different network to access the game using the same address, you will need to use a tool like Tailscale or a tunnel service that provides a fixed hostname.
 
-The game automatically saves player progress to `backend/data/save.json`. Open the **Settings** menu (gear icon) to toggle audio, perform a manual save, save and exit, restart the game, or log in/out. You can create an account on this server to maintain a separate save file; when you register, the game copies your current progress into that account. Accounts and save data reside locally on the server machine and are not synchronized across different devices. Since the local Wi-Fi connection uses HTTP, please set a unique password for the game—do not reuse passwords used for sensitive or important accounts. Selecting **Restart from Scratch** will erase all progress for the current session, including sales shifts, funds, inventory, staff, character collections, card-opening attempts, and badges. Your user account, however, will remain intact.
+Each browser receives its own guest session. Creating an account transfers only that guest’s progress into the new account; signing in on another device restores the same account. Logging out creates a new guest session. Resetting, inventory, feedback, staff, and collections affect only the current player. Settings contains login, registration, save, logout, and reset.
+
+For Render, configure `DATABASE_URL` for persistent PostgreSQL storage and a new `SESSION_SECRET` of at least 32 characters. Without a database, files are saved separately under `backend/data/profiles/` and `backend/data/guests/`; Render’s ephemeral filesystem loses these on redeploy/restart unless a persistent disk is configured. The old shared `save.json` is preserved as a backup and is never assigned to new visitors. See [the Render setup, deployment, and migration guide](RENDER.md).
 
 Selecting **Save and Exit** will pause your current shift, save your progress, and display the exit screen. The browser cannot automatically close tabs on iPhone; please close the tab yourself after reaching this screen. The next time you open it, select **Continue Playing**.
 
@@ -66,6 +68,7 @@ backend/           Luật chơi, API và dữ liệu lưu
   server.js
   game.js
   accounts.js
+  storage.js      Per-player file or PostgreSQL storage
   data/save.json   Tự tạo khi chạy
 uiux/              Luồng chơi, cấu trúc màn hình, màu sắc
 ```
@@ -82,4 +85,10 @@ Each original portrait is individually aligned—based on facial positioning def
 
 A new map reference image has been integrated at `frontend/assets/concert-map-reference.png`. The game’s interface utilizes a red-orange color palette inspired by the source imagery, complemented by the 34 custom-drawn chibi SVGs, which serve as the game’s illustrative assets. The logo image you provided is stored at `frontend/assets/logo-concert.png` and appears in the header, on the splash screen, and as the browser tab icon.
 
-This is a personal, local-network-based version. To publish it on the Internet or convert it into an Android/iOS app for distribution via app stores, you would need to go through additional packaging and deployment steps, as well as verify the usage rights for any images, branding, and music included.
+The game supports multiple independent players on the same hosted service. To publish it on the Internet or convert it into an Android/iOS app for distribution via app stores, you would need to go through additional packaging and deployment steps, as well as verify the usage rights for any images, branding, and music included.
+
+## Account isolation and cloud verification
+
+The frontend initializes `/api/session` before loading a save. Signed HttpOnly cookies identify the player; `POST /api/action` must include `X-Player-ID` from the session to reject stale tabs after an account switch. No player ID supplied in an action body can select another save. PostgreSQL writes use per-player transactions and row locks. User data, password hashes, signing keys, and `.env` files are excluded from source control.
+
+`npm test` checks separate guest browsers, multiple accounts, concurrent actions, registration from the correct guest, second-device login, logout/reset isolation, stale tabs, invalid cookies, persistence after restart, and PostgreSQL queries through the pg driver with disposable PGlite. The tests close their temporary ports and do not start a persistent server at 4173. Render database connectivity and contention between deployed instances must be checked after configuring the service. `npm run migrate:accounts` explicitly imports a private legacy account/profile backup into PostgreSQL; it never runs on deploy.

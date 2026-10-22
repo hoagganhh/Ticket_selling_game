@@ -3,9 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-export const guestSaveFile = process.env.GAME_SAVE_FILE || path.join(here, 'data', 'save.json');
-let saveFile = guestSaveFile;
-const profileStates = new Map();
+export const guestSaveFile = process.env.GAME_SAVE_FILE || path.join(process.env.GAME_DATA_DIR || path.join(here, 'data'), 'save.json');
 
 export const zones = [
   { id: 'svip', name: 'S-VIP', price: 10000000, stock: 5, color: '#d7f63c', group: 'Đặc biệt' },
@@ -47,6 +45,9 @@ export const merchandise = [
   { id: 'banner', name: 'Banner cổ vũ', pack: 5, cost: 150000, price: 60000, attraction: 6, icon: 'banner' }
 ];
 export const guestProfiles = ['Mẹ', 'Bố', 'Em gái', 'Anh trai', 'Chị gái', 'Ông', 'Bà', 'Bạn thân', 'Đồng nghiệp', 'Bạn học', 'Nhóm bạn', 'Gia đình'];
+
+// Every request receives its own engine. Player state never lives in a shared singleton.
+export function createGame({ file: saveFile = null, snapshot = null } = {}) {
 let state;
 let dirty = false;
 
@@ -90,6 +91,7 @@ function freshState(collection = {}) {
 
 function save() {
   if (!dirty) return;
+  if (!saveFile) { dirty = false; return; }
   fs.mkdirSync(path.dirname(saveFile), { recursive: true });
   const temp = saveFile + '.tmp';
   fs.writeFileSync(temp, JSON.stringify(state, null, 2), 'utf8');
@@ -106,8 +108,8 @@ function save() {
 
 function load() {
   try {
-    const parsed = JSON.parse(fs.readFileSync(saveFile, 'utf8'));
-    if ([1, 2, 3, 4, 5, 6, 7, 8, 9].includes(parsed.version) && parsed.stock && Array.isArray(parsed.queue)) {
+    const parsed = saveFile ? JSON.parse(fs.readFileSync(saveFile, 'utf8')) : structuredClone(snapshot);
+    if (parsed && [1, 2, 3, 4, 5, 6, 7, 8, 9].includes(parsed.version) && parsed.stock && Array.isArray(parsed.queue)) {
       if (parsed.version === 1) {
         parsed.artistDeck = [];
         parsed.queue.forEach((customer, index) => {
@@ -204,20 +206,8 @@ function load() {
 }
 
 state = load();
-profileStates.set(saveFile, state);
 
-export function useSaveFile(file) {
-  const selected = path.resolve(file);
-  if (selected === saveFile) return;
-  save();
-  profileStates.set(saveFile, state);
-  saveFile = selected;
-  dirty = false;
-  state = profileStates.get(selected) || load();
-  profileStates.set(selected, state);
-}
-
-export function saveNow() {
+function saveNow() {
   dirty = true;
   save();
 }
@@ -422,7 +412,7 @@ function removeCustomer(s, c) {
   s.selectedZoneId = null;
 }
 
-export function getPublicState() {
+function getPublicState() {
   tick();
   save();
   return { ...state, gaiConBadge: state.collectedArtists.length === artists.length, zones, artists, merchandise, attraction: attraction(state), shiftSeconds, totalShifts, gameTimeRate,
@@ -441,7 +431,7 @@ function pauseGame(s) {
   note(s, 'Đã tạm dừng. Đồng hồ, khách, sự cố và tiền phạt được giữ nguyên.');
 }
 
-export function act(type, payload = {}) {
+function act(type, payload = {}) {
   tick();
   const s = state;
   if (s.phase === 'gameover' && type !== 'reset' && type !== 'saveNow') return getPublicState();
@@ -698,3 +688,13 @@ export function act(type, payload = {}) {
   save();
   return getPublicState();
 }
+
+return { act, getPublicState, saveNow, snapshot: () => structuredClone(state) };
+}
+
+// Standalone engine used by the existing rule tests and offline save tools only.
+let standaloneGame;
+const standalone = () => standaloneGame ||= createGame({ file: guestSaveFile });
+export const act = (...args) => standalone().act(...args);
+export const getPublicState = () => standalone().getPublicState();
+export const saveNow = () => standalone().saveNow();

@@ -1,5 +1,8 @@
 $ErrorActionPreference = 'Stop'
 
+$disabledFlag = Join-Path $PSScriptRoot 'backend.disabled'
+if (Test-Path -LiteralPath $disabledFlag) { exit 0 }
+
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $runtimeDir = Join-Path $projectRoot 'runtime'
 New-Item -ItemType Directory -Path $runtimeDir -Force | Out-Null
@@ -35,6 +38,10 @@ try {
 
     Write-WatchdogLog 'Watchdog started.'
     while ($true) {
+        if (Test-Path -LiteralPath $disabledFlag) {
+            Write-WatchdogLog 'Watchdog stopped by user request.'
+            break
+        }
         if (Test-PortInUse) {
             Start-Sleep -Seconds 5
             continue

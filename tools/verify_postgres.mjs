@@ -1,0 +1,73 @@
+import assert from 'node:assert/strict';
+import net from 'node:net';
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import { fileURLToPath } from 'node:url';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { PGlite } from '@electric-sql/pglite';
+import { PGLiteSocketServer } from '@electric-sql/pglite-socket';
+
+// Exercise the actual pg driver and SQL against disposable WASM Postgres.
+// Real Render connectivity and multi-instance contention still need the deployed database.
+const temp = fs.mkdtempSync(path.join(path.dirname(fileURLToPath(import.meta.url)), '.test-'));
+const reservation = net.createServer();
+await new Promise(resolve => reservation.listen(0, '127.0.0.1', resolve));
+const port = reservation.address().port;
+await new Promise(resolve => reservation.close(resolve));
+const db = await PGlite.create();
+const wire = new PGLiteSocketServer({ db, host: '127.0.0.1', port, maxConnections: 10 });
+let store;
+try {
+  await wire.start();
+  process.env.DATABASE_URL = `postgresql://postgres:postgres@127.0.0.1:${port}/template1?sslmode=disable`;
+  delete process.env.SESSION_SECRET;
+  const { createStore } = await import('../backend/storage.js');
+  const { createAccounts } = await import('../backend/accounts.js');
+  const { createGame } = await import('../backend/game.js');
+  store = await createStore();
+  assert.equal(store.kind, 'postgres');
+  const accounts = await createAccounts(store);
+  const guestA = accounts.newGuest(), guestB = accounts.newGuest();
+  await store.withGame(guestA, game => game.act('restockMerch', { id: 'lightstick' }));
+  assert.equal((await store.withGame(guestB, game => game.getPublicState())).cash, 3000000);
+  const snapshotA = await store.withGame(guestA, game => game.snapshot());
+  const a = await accounts.registerAccount('Postgres A', 'matkhau123', snapshotA);
+  const b = await accounts.registerAccount('Postgres B', 'matkhau123', null);
+  assert.equal((await store.withGame(a, game => game.getPublicState())).cash, 2700000);
+  assert.equal((await store.withGame(b, game => game.getPublicState())).cash, 3000000);
+  await assert.rejects(accounts.registerAccount('postgres a', 'matkhau123', null), /đã được sử dụng/);
+  const req = { headers: {}, socket: {} };
+  const cookie = accounts.sessionCookie(a, req).split(';')[0];
+  assert.equal((await accounts.playerFromRequest({ ...req, headers: { cookie } })).player.id, a.id);
+  await assert.rejects(store.withGame(a, game => { game.act('restockMerch', { id: 'shirt' }); throw new Error('rollback fixture'); }), /rollback fixture/);
+  assert.equal((await store.withGame(a, game => game.getPublicState())).cash, 2700000, 'failed transactions keep the prior save');
+  await store.withGame(a, game => game.act('reset'));
+  await store.withGame(b, game => game.act('restockMerch', { id: 'banner' }));
+  const backupAccount = { id: crypto.randomUUID(), username: 'Legacy Owner', key: 'legacy owner', salt: crypto.randomBytes(16).toString('hex') };
+  backupAccount.passwordHash = crypto.scryptSync('matkhau123', backupAccount.salt, 64).toString('hex');
+  const legacyState = createGame().snapshot();
+  legacyState.cash = 1234567;
+  fs.mkdirSync(path.join(temp, 'profiles'));
+  fs.writeFileSync(path.join(temp, 'accounts.json'), JSON.stringify([backupAccount]));
+  fs.writeFileSync(path.join(temp, 'profiles', `${backupAccount.id}.json`), JSON.stringify(legacyState));
+  const migrate = () => promisify(execFile)(process.execPath, [fileURLToPath(new URL('./migrate_accounts.mjs', import.meta.url))], { env: { ...process.env, LEGACY_DATA_DIR: temp }, timeout: 30000 });
+  assert.match((await migrate()).stdout, /Đã nhập 1 tài khoản/);
+  assert.match((await migrate()).stdout, /bỏ qua 1 tài khoản/);
+  assert.equal((await store.withGame({ id: backupAccount.id, kind: 'account' }, game => game.getPublicState())).cash, legacyState.cash);
+  assert.ok(fs.existsSync(path.join(temp, 'accounts.json')), 'migration retains the private source backup');
+  await store.close();
+  store = await createStore();
+  const restored = await createAccounts(store);
+  assert.equal((await restored.playerFromRequest({ ...req, headers: { cookie } })).player.id, a.id, 'database signing key survives restart without SESSION_SECRET');
+  assert.equal((await restored.loginAccount('POSTGRES B', 'matkhau123')).id, b.id);
+  assert.equal((await store.withGame(b, game => game.getPublicState())).cash, 2850000);
+  assert.equal((await store.withGame(a, game => game.getPublicState())).cash, 3000000);
+  console.log('PASS: PostgreSQL SQL/pg driver, per-player saves, unique accounts, transaction rollback, restart sessions and repeatable private-backup migration (PGlite).');
+} finally {
+  if (store) await store.close();
+  await wire.stop();
+  await db.close();
+  fs.rmSync(temp, { recursive: true, force: true });
+}
